@@ -3,8 +3,12 @@ const mongoose = require('mongoose');
 // Define a schema for the product
 const productSchema = new mongoose.Schema({
   image: {
-    type: String,
-    required: true,
+    publicId: {
+      type: String,
+    },
+    url: {
+      type: String,
+    },
   },
   title: {
     type: String,
@@ -12,7 +16,7 @@ const productSchema = new mongoose.Schema({
   },
   description: String,
   price: {
-    type: Number,
+    type: String,
     required: true,
   },
   category: {

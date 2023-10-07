@@ -1,35 +1,47 @@
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
+const {cloudinary} = require('../config/cloudinary')
 
 // @desc POST addProduct
 // @route api/products
 // @privacy Private
 const addProduct = asyncHandler(async (req, res) => {
-  const { image, title, description, price, category } = req.body;
+  const { photo, title, description, price, category } = req.body;
+
   const user = await User.findById(req.user);
-  if (!image || !price || !title || !category) {
+  if (!photo || !price || !title || !category) {
     res.status(400);
     throw new Error('Please add all field');
   }
 
-  if (user && user._id.toString() === '650dd65fe4e6fee35f314523') {
-    const product = await Product.create({
-      image,
-      title,
-      description,
-      price,
-      category,
+  try {
+    const fileStr = photo;
+    const uploadedResponse = await cloudinary.uploader.upload(fileStr, {
+      upload_preset: 'j-cassy',
     });
 
-    if (product) {
-      res.status(200);
-      res.json(`${title} has been added successfully`);
+    if (user && user._id.toString() === '650dd65fe4e6fee35f314523') {
+      const product = await Product.create({
+        image: {
+          publicId: uploadedResponse.public_id,
+          url: uploadedResponse.url,
+        },
+        title,
+        description,
+        price,
+        category,
+      });
+
+      if (product) {
+        res.status(200);
+        res.json(`${title} has been added successfully`);
+      }
+    } else {
+      res.status(401);
+      throw new Error('Not Authorized');
     }
-  } else {
-    res.status(401);
-    throw new Error('Not Authorized');
-  }
+  } catch (error) {}
 });
 
 // @desc POST addProduct
