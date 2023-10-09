@@ -1,7 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
-const {cloudinary} = require('../config/cloudinary')
+const { cloudinary } = require('../config/cloudinary');
 
 // @desc POST addProduct
 // @route api/products
@@ -15,13 +15,13 @@ const addProduct = asyncHandler(async (req, res) => {
     throw new Error('Please add all field');
   }
 
-  try {
-    const fileStr = photo;
-    const uploadedResponse = await cloudinary.uploader.upload(fileStr, {
-      upload_preset: 'j-cassy',
-    });
+  if (user && user._id.toString() === '650dd65fe4e6fee35f314523') {
+    try {
+      const fileStr = photo;
+      const uploadedResponse = await cloudinary.uploader.upload(fileStr, {
+        upload_preset: 'j-cassy',
+      });
 
-    if (user && user._id.toString() === '650dd65fe4e6fee35f314523') {
       const product = await Product.create({
         image: {
           publicId: uploadedResponse.public_id,
@@ -34,14 +34,17 @@ const addProduct = asyncHandler(async (req, res) => {
       });
 
       if (product) {
-        res.status(200);
+        res.status(201);
         res.json(`${title} has been added successfully`);
       }
-    } else {
-      res.status(401);
-      throw new Error('Not Authorized');
+    } catch (error) {
+      res.status(400);
+      throw new Error('cannot upload to image');
     }
-  } catch (error) {}
+  } else {
+    res.status(401);
+    throw new Error('Not Authorized');
+  }
 });
 
 // @desc POST addProduct
