@@ -8,62 +8,68 @@ const nodemailer = require('nodemailer');
 // @privacy public
 // @route POST /api/users
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    res.status(400);
-    throw new Error('Please add all filed');
-  }
+  const { name, email, password, role } = req.body;
+  const userAuth = await User.findById(req.user);
 
-  const userExist = await User.findOne({ email });
-  if (userExist) {
-    res.status(400);
-    throw new Error('User already Exist');
-  }
+  if (userAuth && userAuth.role === 'Admin') {
+    if (!name || !email || !password || !role) {
+      res.status(400);
+      throw new Error('Please add all filed');
+    }
 
-  const minLength = 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasDigit = /\d/.test(password);
-  const hasSpecialChar = /[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]/.test(password);
-  const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const userExist = await User.findOne({ email });
+    if (userExist) {
+      res.status(400);
+      throw new Error('User already Exist');
+    }
 
-  if (!hasValidEmail) {
-    res.status(400);
-    throw new Error('Add a valid email address');
-  }
+    const minLength = 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]/.test(password);
+    const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  if (
-    password.length < minLength ||
-    !hasUppercase ||
-    !hasLowercase ||
-    !hasDigit ||
-    !hasSpecialChar
-  ) {
-    res.status(400);
-    throw new Error(
-      'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'
-    );
-  }
+    if (!hasValidEmail) {
+      res.status(400);
+      throw new Error('Add a valid email address');
+    }
 
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-  const user = await User.create({
-    name,
-    email,
-    password: hashedPassword,
-  });
+    if (
+      password.length < minLength ||
+      !hasUppercase ||
+      !hasLowercase ||
+      !hasDigit ||
+      !hasSpecialChar
+    ) {
+      res.status(400);
+      throw new Error(
+        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'
+      );
+    }
 
-  if (user) {
-    res.status(201);
-    res.json({
-      name: user.name,
-      email: user.email,
-      _id: user.id,
-      token: generateToken(user._id),
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
     });
-  } else {
-    res.status(200);
-    throw new Error('Something went wrong');
+
+    if (user) {
+      res.status(201);
+      res.json({
+        name: user.name,
+        email: user.email,
+        role,
+        _id: user.id,
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(200);
+      throw new Error('Something went wrong');
+    }
   }
 });
 
@@ -85,6 +91,7 @@ const loginUser = asyncHandler(async (req, res) => {
       _id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
       token: generateToken(user._id),
     });
   } else {
@@ -103,27 +110,27 @@ const getMe = asyncHandler(async (req, res) => {
     id: _id,
     name,
     email,
+    role: req.user.role,
   });
 });
 
 // @desc POST  updateProfile
 // @privacy private
-// @route POST /api/users/profile
+// @route POST /api/users/me
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { name, email } = req.body;
+  const { email, name, role } = req.body;
 
   // userExist
   const userExist = await User.findOne({ email });
-  if (userExist) {
+  if (!userExist) {
     res.status(400);
-    throw new Error('User already Exist');
+    throw new Error('User does not Exist');
   }
 
-  
   const userData = await User.findByIdAndUpdate(
-    req.user,
-    { name, email },
+    req.user.id,
+    { name, role },
     { new: true }
   );
   res.status(200);

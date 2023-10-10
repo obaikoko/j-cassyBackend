@@ -15,6 +15,12 @@ const userSchema = mongoose.Schema(
       type: String,
       required: [true, 'Please add a password'],
     },
+    role: {
+      type: String,
+      enum: ['Admin', 'Agent'],
+      required: [true, 'select role'],
+      
+    },
     resetNumber: {
       type: String,
     },
