@@ -47,7 +47,7 @@ const addProduct = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc POST addProduct
+// @desc GET getProducts
 // @route api/products
 // @privacy Public
 const getProducts = asyncHandler(async (req, res) => {
@@ -57,6 +57,25 @@ const getProducts = asyncHandler(async (req, res) => {
     res.json(products);
   }
 });
+
+
+// @desc GET getProduct
+// @route api/products
+// @privacy Public
+
+const getProduct = asyncHandler(async(req, res) => {
+  const product = await Product.findById(req.params.id)
+  if (product) {
+    res.status(200)
+    res.json(product)
+  } else {
+    res.status(400)
+    throw new Error('Product not found')
+  }
+})
+
+
+
 
 // @desc PUT updateProduct
 // @route api/products/:id
@@ -146,6 +165,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 module.exports = {
   addProduct,
   getProducts,
+  getProduct,
   updateProduct,
   deleteProduct,
 };
