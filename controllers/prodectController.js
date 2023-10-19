@@ -58,24 +58,20 @@ const getProducts = asyncHandler(async (req, res) => {
   }
 });
 
-
 // @desc GET getProduct
 // @route api/products
 // @privacy Public
 
-const getProduct = asyncHandler(async(req, res) => {
-  const product = await Product.findById(req.params.id)
+const getProduct = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
   if (product) {
-    res.status(200)
-    res.json(product)
+    res.status(200);
+    res.json(product);
   } else {
-    res.status(400)
-    throw new Error('Product not found')
+    res.status(400);
+    throw new Error('Product not found');
   }
-})
-
-
-
+});
 
 // @desc PUT updateProduct
 // @route api/products/:id
@@ -93,37 +89,50 @@ const updateProduct = asyncHandler(async (req, res) => {
     const publicId = productExist.image.publicId;
     const fileStr = photo;
 
-    const uploadedResponse = await cloudinary.uploader.upload(
-      fileStr,
-      { publicId },
-      (error, result) => {
-        if (error) {
-          res.status(400);
-          throw new Error('Error updating image:', error);
-        } else {
-          res.status(200)
-          res.json('Image updated successfully:', result);
-        }
-      }
-    );
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      {
-        image: {
-          publicId: uploadedResponse.public_id,
-          url: uploadedResponse.url,
-        },
-        title,
-        description,
-        price,
-        category,
-      },
-      { new: true }
-    );
+    if (fileStr) {
+      try {
+        const uploadedResponse = await cloudinary.uploader.upload(fileStr, {
+          publicId,
+        });
 
-    if (product) {
-      res.status(200);
-      res.json(`${title} has been updated successfully`);
+        const product = await Product.findByIdAndUpdate(
+          req.params.id,
+          {
+            image: {
+              publicId: uploadedResponse.public_id,
+              url: uploadedResponse.url,
+            },
+            title,
+            description,
+            price,
+            category,
+          },
+          { new: true }
+        );
+
+        if (product) {
+          res.status(200);
+          res.json('Product updated successfully');
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    } else {
+      const product = await Product.findByIdAndUpdate(
+        req.params.id,
+        {
+          title,
+          description,
+          price,
+          category,
+        },
+        { new: true }
+      );
+
+      if (product) {
+        res.status(200);
+        res.json(`${title} has been updated successfully`);
+      }
     }
   } else {
     res.status(401);
