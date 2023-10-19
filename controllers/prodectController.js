@@ -152,18 +152,16 @@ const deleteProduct = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user);
   if (user && user.role === 'Admin') {
     const publicId = product.image.publicId;
-    await cloudinary.uploader.destroy(publicId, (error, result) => {
-      if (error) {
-        console.error('Error deleting image:', error);
-      } else {
-        console.log('Image deleted successfully:', result);
-      }
-    });
 
-    const product = await Product.findByIdAndDelete(req.params.id);
-    if (product) {
-      res.status(200);
-      res.json(product._id);
+    try {
+      await cloudinary.uploader.destroy(publicId);
+      const product = await Product.findByIdAndDelete(req.params.id);
+      if (product) {
+        res.status(200);
+        res.json(product._id);
+      }
+    } catch (error) {
+      console.log(error);
     }
   } else {
     res.status(401);

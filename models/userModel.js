@@ -18,7 +18,7 @@ const userSchema = mongoose.Schema(
     role: {
       type: String,
       enum: ['Admin', 'Agent'],
-      required: [true, 'select role'],
+      required: [false, 'select role'],
       
     },
     resetNumber: {

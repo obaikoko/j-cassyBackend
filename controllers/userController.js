@@ -150,9 +150,8 @@ const resetPassword = asyncHandler(async (req, res) => {
     throw new Error(`No account found for ${email} `);
   } else {
     const sixDigitNumber = generateSixDigitNumber();
-    const expirationTime = new Date(Date.now() + 60000); // 60 seconds in milliseconds
+    const expirationTime = new Date(Date.now() + 120000);
 
-    // Store the number and its expiration time in the user document
     user.resetNumber = sixDigitNumber;
     user.resetNumberExpires = expirationTime;
     await user.save();
@@ -195,6 +194,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 const verifyResetPassword = asyncHandler(async (req, res) => {
   const { email, otp, newPassword } = req.body;
+  console.log(req.body);
   const user = await User.findOne({ email });
   const minLength = 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
@@ -218,7 +218,7 @@ const verifyResetPassword = asyncHandler(async (req, res) => {
   }
 
   if (
-    password.length < minLength ||
+    newPassword.length < minLength ||
     !hasUppercase ||
     !hasLowercase ||
     !hasDigit ||
