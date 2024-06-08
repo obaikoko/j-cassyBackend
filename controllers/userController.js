@@ -1,98 +1,33 @@
-const asyncHandler = require('express-async-handler');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/userModel');
-const nodemailer = require('nodemailer');
+import asyncHandler from '../middleware/asyncHandler.js';
+import User from '../models/userModel.js';
+import generateToken from '../utils/generateToken.js';
 
-// @desc Register User
-// @privacy public
-// @route POST /api/users
-const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
-  const userAuth = await User.findById(req.user);
-
-  if (userAuth && userAuth.role === 'Admin') {
-    if (!name || !email || !password || !role) {
-      res.status(400);
-      throw new Error('Please add all filed');
-    }
-
-    const userExist = await User.findOne({ email });
-    if (userExist) {
-      res.status(400);
-      throw new Error('User already Exist');
-    }
-
-    const minLength = 8;
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasDigit = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]/.test(password);
-    const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-    if (!hasValidEmail) {
-      res.status(400);
-      throw new Error('Add a valid email address');
-    }
-
-    if (
-      password.length < minLength ||
-      !hasUppercase ||
-      !hasLowercase ||
-      !hasDigit ||
-      !hasSpecialChar
-    ) {
-      res.status(400);
-      throw new Error(
-        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'
-      );
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-    });
-
-    if (user) {
-      res.status(201);
-      res.json({
-        name: user.name,
-        email: user.email,
-        role,
-        _id: user.id,
-        token: generateToken(user._id),
-      });
-    } else {
-      res.status(200);
-      throw new Error('Something went wrong');
-    }
-  }
-});
-
-// @desc Login User
-// @privacy public
-// @route POST /api/users/login
-const loginUser = asyncHandler(async (req, res) => {
+// @description This is to authenticate users
+// @Route POST /api/users/auth
+// privacy Public
+const authUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
 
   if (!email || !password) {
     res.status(400);
-    throw new Error('Invalid email or password ');
+    throw new Error('Please add all field');
   }
 
-  if (user && (await bcrypt.compare(password, user.password))) {
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(400);
+    throw new Error('invalid username or password');
+  }
+
+  if (user && (await user.matchPassword(password))) {
     res.status(200);
+    generateToken(res, user._id);
     res.json({
-      _id: user.id,
-      name: user.name,
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
-      role: user.role,
-      token: generateToken(user._id),
+      isAdmin: user.isAdmin,
     });
   } else {
     res.status(400);
@@ -100,159 +35,174 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc Get  Userdate
-// @privacy public
-// @route POST /api/users
-const getMe = asyncHandler(async (req, res) => {
-  const { name, email, _id } = await User.findByIdAndUpdate(req.user.id);
-  res.status(200);
-  res.json({
-    id: _id,
-    name,
-    email,
-    role: req.user.role,
-  });
-});
+// @description Register users
+// @Route POST /api/users/
+// privacy Public
+const registerUser = asyncHandler(async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
+  if (!firstName || !lastName || !email || !password) {
+    res.status(400);
+    throw new Error('Please add all field');
+  }
 
-// @desc POST  updateProfile
-// @privacy private
-// @route POST /api/users/me
-
-const updateProfile = asyncHandler(async (req, res) => {
-  const { email, name, role } = req.body;
-
-  // userExist
+  // check if user exist
   const userExist = await User.findOne({ email });
-  if (!userExist) {
+  if (userExist) {
     res.status(400);
-    throw new Error('User does not Exist');
+    throw new Error('User already exist');
   }
-
-  const userData = await User.findByIdAndUpdate(
-    req.user.id,
-    { name, role },
-    { new: true }
-  );
-  res.status(200);
-  res.json(userData);
-});
-
-// @desc POST update Password
-// @privacy public
-// @route POST /api/users/resetPassword
-
-const resetPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    res.status(404);
-    throw new Error(`No account found for ${email} `);
+  const user = await User.create({ firstName, lastName, email, password });
+  if (user) {
+    res.status(200);
+    generateToken(res, user._id);
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      isAdmin: user.isAdmin,
+    });
   } else {
-    const sixDigitNumber = generateSixDigitNumber();
-    const expirationTime = new Date(Date.now() + 120000);
-
-    user.resetNumber = sixDigitNumber;
-    user.resetNumberExpires = expirationTime;
-    await user.save();
-
-    try {
-      const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: {
-          user: process.env.GMAILEMAIL,
-          pass: process.env.GMAILPASSWORD,
-        },
-        tls: {
-          rejectUnauthorized: true,
-        },
-      });
-
-      const mailOptions = {
-        from: 'J-CANDY',
-        to: email,
-        subject: 'PASSWORD RESET',
-        text: `Here is your OTP which expires on ${expirationTime}: ${sixDigitNumber}`,
-      };
-
-      await transporter.sendMail(mailOptions);
-
-      res.status(200).json({ message: `Email sent successfully! to ${email}` });
-    } catch (error) {
-      console.error(error);
-      res.status(500);
-      throw new Error('Email could not be sent.');
-    }
-  }
-
-  function generateSixDigitNumber() {
-    const min = 100000; // Minimum 6-digit number
-    const max = 999999; // Maximum 6-digit number
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    res.status(500);
+    throw new Error('Something went wrong');
   }
 });
 
-const verifyResetPassword = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword } = req.body;
-  console.log(req.body);
-  const user = await User.findOne({ email });
-  const minLength = 8;
-  const hasUppercase = /[A-Z]/.test(newPassword);
-  const hasLowercase = /[a-z]/.test(newPassword);
-  const hasDigit = /\d/.test(newPassword);
-  const hasSpecialChar = /[!@#$%^&*()_+{}\[\]:;<>,.?~\\-]/.test(newPassword);
-
-  if (!user) {
-    res.status(404);
-    throw new Error(`No account found for ${email}`);
-  }
-
-  if (user.resetNumber !== otp) {
-    res.status(400);
-    throw new Error('Invalid OTP');
-  }
-
-  if (user.resetNumberExpires < new Date()) {
-    res.status(400);
-    throw new Error('OTP has expired');
-  }
-
-  if (
-    newPassword.length < minLength ||
-    !hasUppercase ||
-    !hasLowercase ||
-    !hasDigit ||
-    !hasSpecialChar
-  ) {
-    res.status(400);
-    throw new Error(
-      'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.'
-    );
-  }
-
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(newPassword, salt);
-  user.password = hashedPassword;
-
-  user.resetNumber = '';
-  user.resetNumberExpires = '';
-
-  await user.save();
-
-  res.status(200).json({ message: 'Password reset successful' });
-});
-
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
+// @description This is to logout user
+// @Route POST /api/users/logout
+// privacy Private
+const logoutUser = asyncHandler(async (req, res) => {
+  res.cookie('jwt', '', {
+    httpOnly: true,
+    expires: new Date(0),
   });
-};
+  res.status(200).json({ message: 'Logout User ' });
+});
 
-module.exports = {
+// @description This is to authenticate users
+// @Route GET /api/users
+// privacy Private
+const getUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    res.status(200).json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      isAdmin: user.isAdmin,
+    });
+  }
+});
+
+// @description This is to authenticate users
+// @Route PUT /api/users/
+// privacy Private
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    user.firstName = req.body.firstName || user.firstName;
+    user.lastName = req.body.lastName || user.lastName;
+    user.email = req.body.email || user.email;
+    if (req.body.password) {
+      user.password = req.body.password || user.password;
+    }
+
+    
+
+    const updatedUser = await user.save();
+
+    res.json({
+      _id: updatedUser._id,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      email: updatedUser.email,
+      isAdmin: updatedUser.isAdmin,
+    });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+// @description This is to delete a user
+// @Route DELETE /api/users/:id
+// privacy Private
+const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (user) {
+    if (user.isAdmin) {
+      res.status(400);
+      throw new Error('Can not delete admin user');
+    }
+    await User.deleteOne({ _id: user._id });
+    res.json({ message: 'User removed' });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+// @description This is to get all users
+// @Route GET /api/users
+// privacy Private
+const getUsers = asyncHandler(async (req, res) => {
+  const users = await User.find({});
+  res.json(users);
+});
+
+// @description This is to get user by ID
+// @Route POST /api/users/:id
+// privacy Private
+const getUserById = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id).select('-password');
+
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+// @description This is to update user
+// @Route POST /api/users/:id
+// privacy Private
+const updateUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (user) {
+    user.firstName = req.body.firstName || user.firstName;
+    user.lastName = req.body.lastName || user.firstName;
+    user.email = req.body.email || user.email;
+    user.isAdmin = Boolean(req.body.isAdmin);
+
+    const updatedUser = await user.save();
+
+    res.json({
+      _id: updatedUser._id,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      email: updatedUser.email,
+      isAdmin: updatedUser.isAdmin,
+    });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+export {
+  authUser,
   registerUser,
-  loginUser,
-  getMe,
-  resetPassword,
-  verifyResetPassword,
-  updateProfile,
+  logoutUser,
+  getUserProfile,
+  updateUserProfile,
+  getUsers,
+  deleteUser,
+  getUserById,
+  updateUser,
 };

@@ -1,29 +1,88 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-// Define a schema for the product
-const productSchema = new mongoose.Schema({
-  image: {
-    publicId: {
-      type: String,
+const reviewSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'User',
     },
-    url: {
+    name: {
       type: String,
+      required: true,
+    },
+    rating: {
+      type: Number,
+      required: true,
+    },
+    comment: {
+      type: String,
+      required: true,
     },
   },
-  title: {
-    type: String,
-    required: true,
-  },
-  description: String,
-  price: {
-    type: String,
-    required: true,
-  },
-  category: {
-    type: String,
-    enum: ['Men', 'Women', 'Unisex'],
-    required: true,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
-module.exports = mongoose.model('Product', productSchema);
+const productSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'User',
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    image: {
+      publicId: {
+        type: String,
+      },
+      url: {
+        type: String,
+      },
+    },
+    brand: {
+      type: String,
+      required: true,
+    },
+    category: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    reviews: [reviewSchema],
+    rating: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    numReviews: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    price: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    countInStock: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Product = mongoose.model('Product', productSchema);
+
+export default Product;
