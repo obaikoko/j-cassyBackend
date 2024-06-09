@@ -18,7 +18,7 @@ connectDB();
 const app = express();
 const corsOptions = {
   // origin: 'http://localhost:3000',
-  origin: 'http://jcassy.vercel.app',
+  origin: 'https://jcassy.vercel.app',
   credentials: true,
 };
 
